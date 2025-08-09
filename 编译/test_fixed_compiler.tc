@@ -1,0 +1,22 @@
+// 综合测试用例
+int fibonacci(int n) {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+}
+
+int main() {
+    int x = 10;
+    int y = 20;
+    int z = x + y * 2; // 测试优先级：10 + 20*2 = 50
+    
+    if (z > 40) {
+        z = z - 10; // z = 40
+    }
+    
+    int fib = fibonacci(5); // 应该是5
+    
+    return z + fib; // 40 + 5 = 45
+}

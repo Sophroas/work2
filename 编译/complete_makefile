@@ -1,0 +1,135 @@
+# 完整的ToyC编译器Makefile
+
+CXX = g++
+CXXFLAGS = -std=c++20 -Wall -Wextra -O2
+INCLUDES = -Isrc -I.
+
+# 核心源文件
+CORE_SOURCES = src/ast.cpp \
+               src/symbol_table.cpp \
+               src/semantic_analyzer.cpp \
+               src/code_generator.cpp \
+               src/optimizer.cpp \
+               src/manual_lexer.cpp \
+               src/manual_parser.cpp
+
+# 目标文件
+CORE_OBJECTS = $(CORE_SOURCES:.cpp=.o)
+
+# 编译器程序
+COMPILER_TARGET = toyc_compiler
+TEST_TARGET = test_compiler
+BATCH_TEST_TARGET = batch_test
+
+.PHONY: all test batch_test clean help debug
+
+all: $(COMPILER_TARGET)
+
+# 主编译器
+$(COMPILER_TARGET): src/toyc_main.cpp $(CORE_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< $(CORE_OBJECTS) -o $@
+
+# 测试程序
+$(TEST_TARGET): comprehensive_test.cpp $(CORE_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< $(CORE_OBJECTS) -o $@
+
+# 编译对象文件
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# 调试版本
+debug: CXXFLAGS += -g -DDEBUG_INPUT -DDEBUG_TOKENS -DDEBUG_AST -DDEBUG_SEMANTIC -DDEBUG_OPTIMIZATION
+debug: $(COMPILER_TARGET)
+
+# 测试单个用例
+test: $(COMPILER_TARGET)
+	@echo "=== 测试最小用例 ==="
+	./$(COMPILER_TARGET) < 01_minimal.tc > 01_minimal.s
+	@if [ $$? -eq 0 ]; then \
+		echo "✓ 01_minimal.tc 编译成功"; \
+		echo "生成的汇编代码:"; \
+		head -20 01_minimal.s; \
+	else \
+		echo "✗ 01_minimal.tc 编译失败"; \
+	fi
+
+# 批量测试所有用例
+batch_test: $(COMPILER_TARGET)
+	@echo "=== ToyC编译器批量测试 ==="
+	@total=0; passed=0; \
+	for tc_file in *.tc; do \
+		if [ -f "$$tc_file" ]; then \
+			total=$$((total + 1)); \
+			echo -n "测试 $$tc_file: "; \
+			if ./$(COMPILER_TARGET) < "$$tc_file" > "$${tc_file%.tc}.s" 2>/dev/null; then \
+				echo "✓ 编译成功"; \
+				passed=$$((passed + 1)); \
+			else \
+				echo "✗ 编译失败"; \
+			fi; \
+		fi; \
+	done; \
+	echo "=== 测试结果 ==="; \
+	echo "总计: $$total 个测试用例"; \
+	echo "通过: $$passed 个"; \
+	echo "失败: $$((total - passed)) 个"; \
+	if [ $$passed -eq $$total ]; then \
+		echo "🎉 所有测试用例通过！"; \
+	else \
+		echo "⚠️  部分测试用例失败"; \
+	fi
+
+# 详细测试（显示详细输出）
+verbose_test: $(COMPILER_TARGET)
+	@echo "=== 详细测试模式 ==="
+	@for tc_file in *.tc; do \
+		if [ -f "$$tc_file" ]; then \
+			echo "=========================================="; \
+			echo "测试: $$tc_file"; \
+			echo "源代码:"; \
+			cat "$$tc_file"; \
+			echo ""; \
+			echo "编译结果:"; \
+			if ./$(COMPILER_TARGET) < "$$tc_file" > "$${tc_file%.tc}.s" 2>&1; then \
+				echo "✓ 编译成功"; \
+				echo "生成的汇编代码:"; \
+				cat "$${tc_file%.tc}.s"; \
+			else \
+				echo "✗ 编译失败"; \
+			fi; \
+			echo ""; \
+		fi; \
+	done
+
+# 清理
+clean:
+	rm -f $(CORE_OBJECTS) $(COMPILER_TARGET) $(TEST_TARGET) *.s
+
+# 帮助
+help:
+	@echo "ToyC编译器构建系统"
+	@echo ""
+	@echo "目标:"
+	@echo "  all         - 构建编译器 (默认)"
+	@echo "  test        - 测试单个用例"
+	@echo "  batch_test  - 批量测试所有用例"
+	@echo "  verbose_test- 详细测试模式"
+	@echo "  debug       - 构建调试版本"
+	@echo "  clean       - 清理构建文件"
+	@echo "  help        - 显示此帮助信息"
+	@echo ""
+	@echo "使用方式:"
+	@echo "  make"
+	@echo "  ./toyc_compiler < input.tc > output.s"
+	@echo "  ./toyc_compiler -opt < input.tc > output.s"
+	@echo "  make batch_test"
+
+# 依赖关系
+src/ast.o: src/ast.cpp src/ast.h
+src/symbol_table.o: src/symbol_table.cpp src/symbol_table.h
+src/semantic_analyzer.o: src/semantic_analyzer.cpp src/semantic_analyzer.h src/ast.h src/symbol_table.h
+src/code_generator.o: src/code_generator.cpp src/code_generator.h src/ast.h src/symbol_table.h
+src/optimizer.o: src/optimizer.cpp src/optimizer.h src/ast.h
+src/manual_lexer.o: src/manual_lexer.cpp src/manual_lexer.h
+src/manual_parser.o: src/manual_parser.cpp src/manual_parser.h src/manual_lexer.h src/ast.h
+src/toyc_main.o: src/toyc_main.cpp src/manual_lexer.h src/manual_parser.h src/semantic_analyzer.h src/code_generator.h src/optimizer.h
